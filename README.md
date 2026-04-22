@@ -4,7 +4,7 @@ A [pi](https://pi.dev) extension that brings **Claude Code-style autonomous sub-
 
 > **Status:** Early release.
 
-<img width="600" alt="pi-subagents screenshot" src="https://github.com/tintinweb/pi-subagents/raw/master/media/screenshot.png" />
+<img width="600" alt="pi-subagents screenshot" src="https://github.com/jeonghyeon-net/pi-subagents/raw/master/media/screenshot.png" />
 
 
 https://github.com/user-attachments/assets/8685261b-9338-4fea-8dfe-1c590d5df543
