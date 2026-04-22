@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-04-23
+
+### Fixed
+- **Completion nudges no longer auto-trigger a parent reply** — background `subagent-notification` messages still appear visually, but they are now delivered as passive follow-ups (`triggerTurn: false`). This prevents duplicate parent responses and stray `Working...` states after a subagent already finished and the result was manually inspected.
+
 ## [0.5.4] - 2026-04-22
 
 ### Fixed
