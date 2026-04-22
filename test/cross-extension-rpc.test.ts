@@ -161,7 +161,7 @@ describe("cross-extension RPC", () => {
   // --- stop ---
 
   describe("stop RPC", () => {
-    it("returns success when agent is aborted", async () => {
+    it("returns success when agent is stopped", async () => {
       registerRpcHandlers(deps);
       const reply = vi.fn();
       events.on("subagents:rpc:stop:reply:req-st1", reply);

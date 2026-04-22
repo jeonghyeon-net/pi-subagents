@@ -19,7 +19,7 @@ export { SPINNER, SPINNER_INTERVAL_MS } from "./spinner.js";
 const MAX_WIDGET_LINES = 12;
 
 /** Statuses that indicate an error/non-success outcome (used for linger behavior and icon rendering). */
-export const ERROR_STATUSES = new Set(["error", "aborted", "steered", "stopped"]);
+export const ERROR_STATUSES = new Set(["error", "stopped"]);
 
 /** Tool name → human-readable action for activity descriptions. */
 const TOOL_DISPLAY: Record<string, string> = {
@@ -55,10 +55,6 @@ export interface AgentActivity {
   tokens: string;
   responseText: string;
   session?: { getSessionStats(): { tokens: { total: number } } };
-  /** Current turn count. */
-  turnCount: number;
-  /** Effective max turns for this agent (undefined = unlimited). */
-  maxTurns?: number;
 }
 
 /** Metadata attached to Agent tool results for custom rendering. */
@@ -69,7 +65,7 @@ export interface AgentDetails {
   toolUses: number;
   tokens: string;
   durationMs: number;
-  status: "queued" | "running" | "completed" | "steered" | "aborted" | "stopped" | "error" | "background";
+  status: "queued" | "running" | "completed" | "stopped" | "error" | "background";
   /** Human-readable description of what the agent is currently doing. */
   activity?: string;
   /** Current spinner frame index (for animated running indicator). */
@@ -78,10 +74,6 @@ export interface AgentDetails {
   modelName?: string;
   /** Notable config tags (e.g. ["thinking: high", "isolated"]). */
   tags?: string[];
-  /** Current turn count. */
-  turnCount?: number;
-  /** Effective max turns (undefined = unlimited). */
-  maxTurns?: number;
   agentId?: string;
   error?: string;
 }
@@ -93,11 +85,6 @@ export function formatTokens(count: number): string {
   if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M tokens`;
   if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k tokens`;
   return `${count} token${count === 1 ? "" : "s"}`;
-}
-
-/** Format turn count clearly without glyph overlap issues. */
-export function formatTurns(turnCount: number, maxTurns?: number | null): string {
-  return maxTurns != null ? `turn ${turnCount}/${maxTurns}` : `turn ${turnCount}`;
 }
 
 /** Format milliseconds as human-readable duration. */
@@ -163,10 +150,10 @@ export class AgentWidget {
   private uiCtx: UICtx | undefined;
   private widgetFrame = 0;
   private widgetInterval: ReturnType<typeof setInterval> | undefined;
-  /** Tracks how many turns each finished agent has survived. Key: agent ID, Value: turns since finished. */
-  private finishedTurnAge = new Map<string, number>();
-  /** How many extra turns errors/aborted agents linger (completed agents clear after 1 turn). */
-  private static readonly ERROR_LINGER_TURNS = 2;
+  /** Tracks how many refresh cycles each finished agent has survived. Key: agent ID, Value: cycles since finished. */
+  private finishedAge = new Map<string, number>();
+  /** How many extra cycles errored/stopped agents linger (completed agents clear after 1 cycle). */
+  private static readonly ERROR_LINGER_CYCLES = 2;
 
   /** Whether the widget callback is currently registered with the TUI. */
   private widgetRegistered = false;
@@ -193,15 +180,13 @@ export class AgentWidget {
   }
 
   /**
-   * Called on each new turn (tool_execution_start).
+   * Called when the parent session becomes active again.
    * Ages finished agents and clears those that have lingered long enough.
    */
-  onTurnStart() {
-    // Age all finished agents
-    for (const [id, age] of this.finishedTurnAge) {
-      this.finishedTurnAge.set(id, age + 1);
+  onActivity() {
+    for (const [id, age] of this.finishedAge) {
+      this.finishedAge.set(id, age + 1);
     }
-    // Trigger a widget refresh (will filter out expired agents)
     this.update();
   }
 
@@ -214,15 +199,15 @@ export class AgentWidget {
 
   /** Check if a finished agent should still be shown in the widget. */
   private shouldShowFinished(agentId: string, status: string): boolean {
-    const age = this.finishedTurnAge.get(agentId) ?? 0;
-    const maxAge = ERROR_STATUSES.has(status) ? AgentWidget.ERROR_LINGER_TURNS : 1;
+    const age = this.finishedAge.get(agentId) ?? 0;
+    const maxAge = ERROR_STATUSES.has(status) ? AgentWidget.ERROR_LINGER_CYCLES : 1;
     return age < maxAge;
   }
 
   /** Record an agent as finished (call when agent completes). */
   markFinished(agentId: string) {
-    if (!this.finishedTurnAge.has(agentId)) {
-      this.finishedTurnAge.set(agentId, 0);
+    if (!this.finishedAge.has(agentId)) {
+      this.finishedAge.set(agentId, 0);
     }
   }
 
@@ -237,25 +222,16 @@ export class AgentWidget {
     if (a.status === "completed") {
       icon = theme.fg("success", "✓");
       statusText = "";
-    } else if (a.status === "steered") {
-      icon = theme.fg("warning", "✓");
-      statusText = theme.fg("warning", " (turn limit)");
     } else if (a.status === "stopped") {
       icon = theme.fg("dim", "■");
       statusText = theme.fg("dim", " stopped");
-    } else if (a.status === "error") {
+    } else {
       icon = theme.fg("error", "✗");
       const errMsg = a.error ? `: ${a.error.slice(0, 60)}` : "";
       statusText = theme.fg("error", ` error${errMsg}`);
-    } else {
-      // aborted
-      icon = theme.fg("error", "✗");
-      statusText = theme.fg("warning", " aborted");
     }
 
     const parts: string[] = [];
-    const activity = this.agentActivity.get(a.id);
-    if (activity) parts.push(formatTurns(activity.turnCount, activity.maxTurns));
     if (a.toolUses > 0) parts.push(`${a.toolUses} tool use${a.toolUses === 1 ? "" : "s"}`);
     parts.push(duration);
 
@@ -311,7 +287,6 @@ export class AgentWidget {
       }
 
       const parts: string[] = [];
-      if (bg) parts.push(formatTurns(bg.turnCount, bg.maxTurns));
       if (toolUses > 0) parts.push(`${toolUses} tool use${toolUses === 1 ? "" : "s"}`);
       if (tokenText) parts.push(tokenText);
       parts.push(elapsed);
@@ -429,8 +404,8 @@ export class AgentWidget {
       }
       if (this.widgetInterval) { clearInterval(this.widgetInterval); this.widgetInterval = undefined; }
       // Clean up stale entries
-      for (const [id] of this.finishedTurnAge) {
-        if (!allAgents.some(a => a.id === id)) this.finishedTurnAge.delete(id);
+      for (const [id] of this.finishedAge) {
+        if (!allAgents.some(a => a.id === id)) this.finishedAge.delete(id);
       }
       return;
     }

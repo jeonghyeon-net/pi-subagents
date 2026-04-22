@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { deliverSubagentNotification, formatSubagentToast, SUBAGENT_NOTIFICATION_OPTIONS } from "../src/notification-delivery.js";
+import { deliverSubagentNotification, formatSubagentToast } from "../src/notification-delivery.js";
 import type { NotificationDetails } from "../src/types.js";
 
 function makeDetails(overrides: Partial<NotificationDetails> = {}): NotificationDetails {
@@ -8,8 +8,6 @@ function makeDetails(overrides: Partial<NotificationDetails> = {}): Notification
     description: "Subagent A",
     status: "completed",
     toolUses: 2,
-    turnCount: 1,
-    maxTurns: undefined,
     totalTokens: 5700,
     durationMs: 3400,
     resultPreview: "바위 안정적이라서",
@@ -18,10 +16,6 @@ function makeDetails(overrides: Partial<NotificationDetails> = {}): Notification
 }
 
 describe("notification delivery", () => {
-  it("keeps fallback session nudges passive", () => {
-    expect(SUBAGENT_NOTIFICATION_OPTIONS).toEqual({ deliverAs: "followUp", triggerTurn: false });
-  });
-
   it("formats a concise toast for a single interactive completion", () => {
     const text = formatSubagentToast(makeDetails());
     expect(text).toContain("Background agent update");
@@ -47,7 +41,7 @@ describe("notification delivery", () => {
     expect(text).not.toContain("Subagent C — completed");
   });
 
-  it("uses ui notifications in interactive sessions instead of injecting chat messages", () => {
+  it("suppresses background completion delivery in interactive sessions", () => {
     const sendMessage = vi.fn();
     const notify = vi.fn();
 
@@ -57,14 +51,12 @@ describe("notification delivery", () => {
       { content: "raw", details: makeDetails() },
     );
 
-    expect(route).toBe("ui");
-    expect(notify).toHaveBeenCalledOnce();
-    expect(notify.mock.calls[0]?.[0]).toContain("Subagent A — completed");
-    expect(notify.mock.calls[0]?.[1]).toBe("info");
+    expect(route).toBe("suppressed");
+    expect(notify).not.toHaveBeenCalled();
     expect(sendMessage).not.toHaveBeenCalled();
   });
 
-  it("falls back to session messages when no interactive UI is available", () => {
+  it("suppresses background completion delivery without a UI as well", () => {
     const sendMessage = vi.fn();
 
     const route = deliverSubagentNotification(
@@ -73,13 +65,7 @@ describe("notification delivery", () => {
       { content: "raw", details: makeDetails({ status: "error" }) },
     );
 
-    expect(route).toBe("session");
-    expect(sendMessage).toHaveBeenCalledOnce();
-    expect(sendMessage).toHaveBeenCalledWith({
-      customType: "subagent-notification",
-      content: "raw",
-      display: true,
-      details: expect.objectContaining({ description: "Subagent A", status: "error" }),
-    }, SUBAGENT_NOTIFICATION_OPTIONS);
+    expect(route).toBe("suppressed");
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });

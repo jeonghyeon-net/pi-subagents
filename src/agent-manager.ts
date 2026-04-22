@@ -30,7 +30,6 @@ interface SpawnArgs {
 interface SpawnOptions {
   description: string;
   model?: Model<any>;
-  maxTurns?: number;
   isolated?: boolean;
   inheritContext?: boolean;
   thinkingLevel?: ThinkingLevel;
@@ -43,8 +42,6 @@ interface SpawnOptions {
   onTextDelta?: (delta: string, fullText: string) => void;
   /** Called when the agent session is created (for accessing session stats). */
   onSessionCreated?: (session: AgentSession) => void;
-  /** Called at the end of each agentic turn with the cumulative count. */
-  onTurnEnd?: (turnCount: number) => void;
 }
 
 export class AgentManager {
@@ -140,7 +137,6 @@ export class AgentManager {
     const promise = runAgent(ctx, type, effectivePrompt, {
       pi,
       model: options.model,
-      maxTurns: options.maxTurns,
       isolated: options.isolated,
       inheritContext: options.inheritContext,
       thinkingLevel: options.thinkingLevel,
@@ -150,7 +146,6 @@ export class AgentManager {
         if (activity.type === "end") record.toolUses++;
         options.onToolActivity?.(activity);
       },
-      onTurnEnd: options.onTurnEnd,
       onTextDelta: options.onTextDelta,
       onSessionCreated: (session) => {
         record.session = session;
@@ -164,10 +159,10 @@ export class AgentManager {
         options.onSessionCreated?.(session);
       },
     })
-      .then(({ responseText, session, aborted, steered }) => {
+      .then(({ responseText, session }) => {
         // Don't overwrite status if externally stopped via abort()
         if (record.status !== "stopped") {
-          record.status = aborted ? "aborted" : steered ? "steered" : "completed";
+          record.status = "completed";
         }
         record.result = responseText;
         record.session = session;

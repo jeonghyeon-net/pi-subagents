@@ -24,8 +24,6 @@ const resolvedRun = () =>
   vi.mocked(runAgent).mockResolvedValue({
     responseText: "done",
     session: mockSession(),
-    aborted: false,
-    steered: false,
   });
 
 describe("AgentManager — Bug 1 race condition (resultConsumed vs onComplete)", () => {
@@ -170,8 +168,6 @@ describe("AgentManager — Bug 3 clearCompleted", () => {
     vi.mocked(runAgent).mockResolvedValue({
       responseText: "done",
       session: sess as any,
-      aborted: false,
-      steered: false,
     });
 
     const id = manager.spawn(mockPi, mockCtx, "general-purpose", "test", {

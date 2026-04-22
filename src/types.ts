@@ -33,7 +33,6 @@ export interface AgentConfig {
   skills: true | string[] | false;
   model?: string;
   thinking?: ThinkingLevel;
-  maxTurns?: number;
   systemPrompt: string;
   promptMode: "replace" | "append";
   /** Default for spawn: fork parent conversation. undefined = caller decides. */
@@ -60,7 +59,7 @@ export interface AgentRecord {
   id: string;
   type: SubagentType;
   description: string;
-  status: "queued" | "running" | "completed" | "steered" | "aborted" | "stopped" | "error";
+  status: "queued" | "running" | "completed" | "stopped" | "error";
   result?: string;
   error?: string;
   toolUses: number;
@@ -93,8 +92,6 @@ export interface NotificationDetails {
   description: string;
   status: string;
   toolUses: number;
-  turnCount: number;
-  maxTurns?: number;
   totalTokens: number;
   durationMs: number;
   outputFile?: string;
