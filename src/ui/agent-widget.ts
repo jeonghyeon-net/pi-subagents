@@ -9,14 +9,14 @@ import { truncateToWidth } from "@mariozechner/pi-tui";
 import type { AgentManager } from "../agent-manager.js";
 import { getConfig } from "../agent-types.js";
 import type { SubagentType } from "../types.js";
+import { SPINNER, SPINNER_INTERVAL_MS } from "./spinner.js";
+
+export { SPINNER, SPINNER_INTERVAL_MS } from "./spinner.js";
 
 // ---- Constants ----
 
 /** Maximum number of rendered lines before overflow collapse kicks in. */
 const MAX_WIDGET_LINES = 12;
-
-/** Braille spinner frames for animated running indicator. */
-export const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 /** Statuses that indicate an error/non-success outcome (used for linger behavior and icon rendering). */
 export const ERROR_STATUSES = new Set(["error", "aborted", "steered", "stopped"]);
@@ -88,16 +88,16 @@ export interface AgentDetails {
 
 // ---- Formatting helpers ----
 
-/** Format a token count compactly: "33.8k token", "1.2M token". */
+/** Format a token count compactly: "33.8k tokens", "1.2M tokens". */
 export function formatTokens(count: number): string {
-  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M token`;
-  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k token`;
-  return `${count} token`;
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M tokens`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k tokens`;
+  return `${count} token${count === 1 ? "" : "s"}`;
 }
 
-/** Format turn count with optional max limit: "⟳5≤30" or "⟳5". */
+/** Format turn count clearly without glyph overlap issues. */
 export function formatTurns(turnCount: number, maxTurns?: number | null): string {
-  return maxTurns != null ? `⟳${turnCount}≤${maxTurns}` : `⟳${turnCount}`;
+  return maxTurns != null ? `turn ${turnCount}/${maxTurns}` : `turn ${turnCount}`;
 }
 
 /** Format milliseconds as human-readable duration. */
@@ -208,7 +208,7 @@ export class AgentWidget {
   /** Ensure the widget update timer is running. */
   ensureTimer() {
     if (!this.widgetInterval) {
-      this.widgetInterval = setInterval(() => this.update(), 80);
+      this.widgetInterval = setInterval(() => this.update(), SPINNER_INTERVAL_MS);
     }
   }
 

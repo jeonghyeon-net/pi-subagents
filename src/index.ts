@@ -38,6 +38,7 @@ import {
   getDisplayName,
   getPromptModeLabel,
   SPINNER,
+  SPINNER_INTERVAL_MS,
   type UICtx,
 } from "./ui/agent-widget.js";
 
@@ -643,7 +644,7 @@ Guidelines:
         return new Text(text, 0, 0);
       }
 
-      // Helper: build "haiku · thinking: high · ⟳5≤30 · 3 tool uses · 33.8k tokens" stats string
+      // Helper: build "haiku · thinking: high · turn 5/30 · 3 tool uses · 33.8k tokens" stats string
       const stats = (d: AgentDetails) => {
         const parts: string[] = [];
         if (d.modelName) parts.push(d.modelName);
@@ -915,11 +916,11 @@ Guidelines:
         }
       };
 
-      // Animate spinner at ~80ms (smooth rotation through 10 braille frames)
+      // Animate spinner at Claude Code's 120ms cadence.
       const spinnerInterval = setInterval(() => {
         spinnerFrame++;
         streamUpdate();
-      }, 80);
+      }, SPINNER_INTERVAL_MS);
 
       streamUpdate();
 
