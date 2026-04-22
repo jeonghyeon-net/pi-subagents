@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-04-22
+
+### Fixed
+- **DefaultResourceLoader pi v0.68+ compatibility** — subagents now pass an explicit `agentDir` and shared `settingsManager` into `DefaultResourceLoader`. v0.5.3 fixed `createAgentSession()` and `SettingsManager.create()` usage, but the custom resource loader still left `agentDir` undefined on newer pi versions, which could still surface as `The "path" argument must be of type string. Received undefined` when an agent started.
+
 ## [0.5.3] - 2026-04-22
 
 ### Fixed

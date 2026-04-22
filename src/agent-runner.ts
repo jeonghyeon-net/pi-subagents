@@ -10,6 +10,7 @@ import {
   createAgentSession,
   DefaultResourceLoader,
   type ExtensionAPI,
+  getAgentDir,
   SessionManager,
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
@@ -234,9 +235,16 @@ export async function runAgent(
   // Still pass noSkills: true since we don't need the skill loader to load them again.
   const noSkills = skills === false || Array.isArray(skills);
 
+  const agentDir = getAgentDir();
+  const settingsManager = SettingsManager.create(effectiveCwd, agentDir);
+
   // Load extensions/skills: true or string[] → load; false → don't
+  // pi >= 0.68 requires an explicit agentDir here; omitting it leaves downstream
+  // resource loading with an undefined path and blows up inside node:path calls.
   const loader = new DefaultResourceLoader({
     cwd: effectiveCwd,
+    agentDir,
+    settingsManager,
     noExtensions: extensions === false,
     noSkills,
     noPromptTemplates: true,
@@ -256,9 +264,7 @@ export async function runAgent(
   const sessionOpts: Record<string, unknown> = {
     cwd: effectiveCwd,
     sessionManager: SessionManager.inMemory(effectiveCwd),
-    // Pass cwd explicitly for compatibility with pi >= 0.68, where SettingsManager.create()
-    // no longer falls back to process.cwd(). This avoids `path` being undefined.
-    settingsManager: SettingsManager.create(effectiveCwd),
+    settingsManager,
     modelRegistry: ctx.modelRegistry,
     model,
     resourceLoader: loader,

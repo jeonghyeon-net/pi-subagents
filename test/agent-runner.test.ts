@@ -1,16 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createAgentSession, inMemorySessionManager, createSettingsManager } = vi.hoisted(() => ({
+const { createAgentSession, inMemorySessionManager, createSettingsManager, getAgentDir, loaderReload, loaderCtor } = vi.hoisted(() => ({
   createAgentSession: vi.fn(),
   inMemorySessionManager: vi.fn(() => ({ kind: "memory-session-manager" })),
   createSettingsManager: vi.fn(() => ({ kind: "settings-manager" })),
+  getAgentDir: vi.fn(() => "/home/test/.pi/agent"),
+  loaderReload: vi.fn(async () => {}),
+  loaderCtor: vi.fn(),
 }));
 
 vi.mock("@mariozechner/pi-coding-agent", () => ({
   createAgentSession,
   DefaultResourceLoader: class {
-    async reload() {}
+    constructor(options: any) {
+      loaderCtor(options);
+    }
+    async reload() {
+      return loaderReload();
+    }
   },
+  getAgentDir,
   SessionManager: { inMemory: inMemorySessionManager },
   SettingsManager: { create: createSettingsManager },
 }));
@@ -97,6 +106,9 @@ beforeEach(() => {
   createAgentSession.mockReset();
   inMemorySessionManager.mockClear();
   createSettingsManager.mockClear();
+  getAgentDir.mockClear();
+  loaderReload.mockClear();
+  loaderCtor.mockClear();
 });
 
 describe("agent-runner final output capture", () => {
@@ -109,13 +121,20 @@ describe("agent-runner final output capture", () => {
     expect(result.responseText).toBe("LOCKED");
   });
 
-  it("passes cwd into SettingsManager.create and does not pass Tool instances to createAgentSession", async () => {
+  it("passes explicit cwd and agentDir into settings/resource loading and does not pass Tool instances to createAgentSession", async () => {
     const { session } = createSession("BOUND");
     createAgentSession.mockResolvedValue({ session });
 
     await runAgent(ctx, "Explore", "Say BOUND", { pi });
 
-    expect(createSettingsManager).toHaveBeenCalledWith("/tmp");
+    expect(getAgentDir).toHaveBeenCalledTimes(1);
+    expect(createSettingsManager).toHaveBeenCalledWith("/tmp", "/home/test/.pi/agent");
+    expect(loaderCtor).toHaveBeenCalledWith(expect.objectContaining({
+      cwd: "/tmp",
+      agentDir: "/home/test/.pi/agent",
+      settingsManager: { kind: "settings-manager" },
+      systemPromptOverride: expect.any(Function),
+    }));
     expect(inMemorySessionManager).toHaveBeenCalledWith("/tmp");
     expect(createAgentSession).toHaveBeenCalledWith(expect.objectContaining({
       cwd: "/tmp",
