@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-04-22
+
+### Fixed
+- **Pi v0.68+ compatibility** ([#31](https://github.com/tintinweb/pi-subagents/issues/31)) — subagents now pass an explicit cwd into `SettingsManager.create()` and no longer pass built-in Tool instances into `createAgentSession()`, avoiding `The "path" argument must be of type string. Received undefined` and remaining compatible with pi's tool-name allowlist API.
+- **Windows output file paths** ([#27](https://github.com/tintinweb/pi-subagents/issues/27)) — output transcript paths now sanitize both `/` and `\\`, strip Windows drive prefixes, and ignore unsupported `chmod()` failures on Windows filesystems.
+
 ## [0.5.2] - 2026-03-26
 
 ### Fixed

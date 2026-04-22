@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createAgentSession } = vi.hoisted(() => ({
+const { createAgentSession, inMemorySessionManager, createSettingsManager } = vi.hoisted(() => ({
   createAgentSession: vi.fn(),
+  inMemorySessionManager: vi.fn(() => ({ kind: "memory-session-manager" })),
+  createSettingsManager: vi.fn(() => ({ kind: "settings-manager" })),
 }));
 
 vi.mock("@mariozechner/pi-coding-agent", () => ({
@@ -9,8 +11,8 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
   DefaultResourceLoader: class {
     async reload() {}
   },
-  SessionManager: { inMemory: vi.fn(() => ({ kind: "memory-session-manager" })) },
-  SettingsManager: { create: vi.fn(() => ({ kind: "settings-manager" })) },
+  SessionManager: { inMemory: inMemorySessionManager },
+  SettingsManager: { create: createSettingsManager },
 }));
 
 vi.mock("../src/agent-types.js", () => ({
@@ -93,6 +95,8 @@ const pi = {} as any;
 
 beforeEach(() => {
   createAgentSession.mockReset();
+  inMemorySessionManager.mockClear();
+  createSettingsManager.mockClear();
 });
 
 describe("agent-runner final output capture", () => {
@@ -103,6 +107,23 @@ describe("agent-runner final output capture", () => {
     const result = await runAgent(ctx, "Explore", "Say LOCKED", { pi });
 
     expect(result.responseText).toBe("LOCKED");
+  });
+
+  it("passes cwd into SettingsManager.create and does not pass Tool instances to createAgentSession", async () => {
+    const { session } = createSession("BOUND");
+    createAgentSession.mockResolvedValue({ session });
+
+    await runAgent(ctx, "Explore", "Say BOUND", { pi });
+
+    expect(createSettingsManager).toHaveBeenCalledWith("/tmp");
+    expect(inMemorySessionManager).toHaveBeenCalledWith("/tmp");
+    expect(createAgentSession).toHaveBeenCalledWith(expect.objectContaining({
+      cwd: "/tmp",
+      settingsManager: { kind: "settings-manager" },
+      sessionManager: { kind: "memory-session-manager" },
+      resourceLoader: expect.any(Object),
+    }));
+    expect(createAgentSession.mock.calls[0][0]).not.toHaveProperty("tools");
   });
 
   it("binds extensions before prompting", async () => {

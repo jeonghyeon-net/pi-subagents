@@ -208,6 +208,8 @@ export async function runAgent(
     }
   }
 
+  const builtinToolNames = new Set(tools.map(t => t.name));
+
   // Build system prompt from agent config
   let systemPrompt: string;
   if (agentConfig) {
@@ -254,10 +256,11 @@ export async function runAgent(
   const sessionOpts: Record<string, unknown> = {
     cwd: effectiveCwd,
     sessionManager: SessionManager.inMemory(effectiveCwd),
-    settingsManager: SettingsManager.create(),
+    // Pass cwd explicitly for compatibility with pi >= 0.68, where SettingsManager.create()
+    // no longer falls back to process.cwd(). This avoids `path` being undefined.
+    settingsManager: SettingsManager.create(effectiveCwd),
     modelRegistry: ctx.modelRegistry,
     model,
-    tools,
     resourceLoader: loader,
   };
   if (thinkingLevel) {
@@ -272,25 +275,31 @@ export async function runAgent(
     ? new Set(agentConfig.disallowedTools)
     : undefined;
 
-  // Filter active tools: remove our own tools to prevent nesting,
-  // apply extension allowlist if specified, and apply disallowedTools denylist
+  // Filter active tools: keep the configured built-ins, drop our own tools to prevent
+  // nesting, optionally include extension tools, and apply disallowedTools denylist.
+  //
+  // We intentionally do NOT pass `tools` into createAgentSession(). pi >= 0.68 changed that
+  // option from Tool instances to string allowlists; omitting it keeps us compatible across
+  // old and new pi versions while we activate the exact tool set here before prompting.
+  const desiredActiveTools = [...builtinToolNames].filter((t) => {
+    if (EXCLUDED_TOOL_NAMES.includes(t)) return false;
+    if (disallowedSet?.has(t)) return false;
+    return true;
+  });
+
   if (extensions !== false) {
-    const builtinToolNames = new Set(tools.map(t => t.name));
-    const activeTools = session.getActiveToolNames().filter((t) => {
-      if (EXCLUDED_TOOL_NAMES.includes(t)) return false;
-      if (disallowedSet?.has(t)) return false;
-      if (builtinToolNames.has(t)) return true;
-      if (Array.isArray(extensions)) {
-        return extensions.some(ext => t.startsWith(ext) || t.includes(ext));
+    for (const toolName of session.getActiveToolNames()) {
+      if (EXCLUDED_TOOL_NAMES.includes(toolName)) continue;
+      if (disallowedSet?.has(toolName)) continue;
+      if (builtinToolNames.has(toolName)) continue;
+      if (Array.isArray(extensions) && !extensions.some(ext => toolName.startsWith(ext) || toolName.includes(ext))) {
+        continue;
       }
-      return true;
-    });
-    session.setActiveToolsByName(activeTools);
-  } else if (disallowedSet) {
-    // Even with extensions disabled, apply denylist to built-in tools
-    const activeTools = session.getActiveToolNames().filter(t => !disallowedSet.has(t));
-    session.setActiveToolsByName(activeTools);
+      desiredActiveTools.push(toolName);
+    }
   }
+
+  session.setActiveToolsByName([...new Set(desiredActiveTools)]);
 
   // Bind extensions so that session_start fires and extensions can initialize
   // (e.g. loading credentials, setting up state). Placed after tool filtering

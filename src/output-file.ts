@@ -10,13 +10,25 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentSession, AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 
+/** Encode cwd into a safe relative path segment for output-file storage. */
+function encodeCwd(cwd: string): string {
+  return cwd
+    .replace(/[\\/]/g, "-")
+    .replace(/^[A-Za-z]:-/, "")
+    .replace(/^-+/, "");
+}
+
 /** Create the output file path, ensuring the directory exists.
  *  Mirrors Claude Code's layout: /tmp/{prefix}-{uid}/{encoded-cwd}/{sessionId}/tasks/{agentId}.output */
 export function createOutputFilePath(cwd: string, agentId: string, sessionId: string): string {
-  const encoded = cwd.replace(/\//g, "-").replace(/^-/, "");
+  const encoded = encodeCwd(cwd);
   const root = join(tmpdir(), `pi-subagents-${process.getuid?.() ?? 0}`);
   mkdirSync(root, { recursive: true, mode: 0o700 });
-  chmodSync(root, 0o700);
+  try {
+    chmodSync(root, 0o700);
+  } catch {
+    // Best-effort only. chmod can be unsupported on Windows filesystems.
+  }
   const dir = join(root, encoded, sessionId, "tasks");
   mkdirSync(dir, { recursive: true });
   return join(dir, `${agentId}.output`);
