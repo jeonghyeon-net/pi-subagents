@@ -24,7 +24,7 @@ import { loadCustomAgents } from "./custom-agents.js";
 import { GroupJoinManager } from "./group-join.js";
 import { resolveAgentInvocationConfig, resolveJoinMode } from "./invocation-config.js";
 import { type ModelRegistry, resolveModel } from "./model-resolver.js";
-import { SUBAGENT_NOTIFICATION_OPTIONS } from "./notification-delivery.js";
+import { deliverSubagentNotification } from "./notification-delivery.js";
 import { createOutputFilePath, streamToOutputFile, writeInitialEntry } from "./output-file.js";
 import { type AgentConfig, type AgentRecord, type JoinMode, type NotificationDetails, type SubagentType } from "./types.js";
 import {
@@ -287,12 +287,10 @@ export default function (pi: ExtensionAPI) {
     const notification = formatTaskNotification(record, 500);
     const footer = record.outputFile ? `\nFull transcript available at: ${record.outputFile}` : '';
 
-    pi.sendMessage<NotificationDetails>({
-      customType: "subagent-notification",
+    deliverSubagentNotification(pi, currentCtx, {
       content: notification + footer,
-      display: true,
       details: buildNotificationDetails(record, 500, agentActivity.get(record.id)),
-    }, SUBAGENT_NOTIFICATION_OPTIONS);
+    });
   }
 
   function sendIndividualNudge(record: AgentRecord) {
@@ -324,12 +322,10 @@ export default function (pi: ExtensionAPI) {
           details.others = rest.map(r => buildNotificationDetails(r, 300, agentActivity.get(r.id)));
         }
 
-        pi.sendMessage<NotificationDetails>({
-          customType: "subagent-notification",
+        deliverSubagentNotification(pi, currentCtx, {
           content: `Background agent group completed: ${label}\n\n${notifications}\n\nUse get_subagent_result for full output.`,
-          display: true,
           details,
-        }, SUBAGENT_NOTIFICATION_OPTIONS);
+        });
       });
       widget.update();
     },
@@ -426,13 +422,16 @@ export default function (pi: ExtensionAPI) {
   // --- Cross-extension RPC via pi.events ---
   let currentCtx: ExtensionContext | undefined;
 
-  // Capture ctx from session_start for RPC spawn handler
+  // Capture ctx for RPC handlers and interactive notifications.
   pi.on("session_start", async (_event, ctx) => {
     currentCtx = ctx;
-    manager.clearCompleted();           // preserve existing behavior
+    manager.clearCompleted();
   });
 
-  pi.on("session_switch", () => { manager.clearCompleted(); });
+  pi.on("session_switch", async (_event, ctx) => {
+    currentCtx = ctx;
+    manager.clearCompleted();
+  });
 
   const { unsubPing: unsubPingRpc, unsubSpawn: unsubSpawnRpc, unsubStop: unsubStopRpc } = registerRpcHandlers({
     events: pi.events,
@@ -511,6 +510,7 @@ export default function (pi: ExtensionAPI) {
 
   // Grab UI context from first tool execution + clear lingering widget on new turn
   pi.on("tool_execution_start", async (_event, ctx) => {
+    currentCtx = ctx;
     widget.setUICtx(ctx.ui as UICtx);
     widget.onTurnStart();
   });

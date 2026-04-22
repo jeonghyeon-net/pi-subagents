@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-04-23
+
+### Fixed
+- **Interactive completion nudges no longer appear inline as ghost chat messages** — when background subagents finish in an interactive UI session, notifications are now delivered via `ctx.ui.notify()` toast alerts instead of `pi.sendMessage()` follow-up entries. This keeps the transcript reserved for real user/assistant turns while preserving fallback session messages for non-UI contexts.
+
 ## [0.5.6] - 2026-04-23
 
 ### Fixed
