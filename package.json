@@ -1,6 +1,6 @@
 {
   "name": "@jeonghyeon.net/pi-subagents",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "A pi extension extension that brings smart Claude Code-style autonomous sub-agents to pi.",
   "author": "tintinweb",
   "license": "MIT",
